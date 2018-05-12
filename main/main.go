@@ -4,6 +4,7 @@ import (
 	"flag"
 	"io"
 	"net"
+	"time"
 
 	"github.com/MDGSF/relay"
 	"github.com/MDGSF/utils/log"
@@ -14,20 +15,53 @@ var backenAddr = flag.String("baddr", "", "backen address")
 var frontCipher = flag.String("frc", "", "front cipher")
 var backenCipher = flag.String("brc", "", "backen cipher")
 
+func AfterSeconds(nsecs time.Duration) time.Time {
+	return time.Now().Add(time.Second * nsecs)
+}
+
 func ioBridge(src io.Reader, dst io.Writer, shutdown chan bool) {
 	defer func() {
 		shutdown <- true
 	}()
 
-	buf := make([]byte, 8*1024)
+	buf := make([]byte, 8192)
 	for {
+		var reader *io.Reader
+		if xrw, ok := src.(relay.XReadWriter); ok {
+			reader = &(xrw.XReader.Reader)
+		} else {
+			reader = &src
+		}
+
+		if conn, ok := (*reader).(*net.TCPConn); ok {
+			err := conn.SetReadDeadline(AfterSeconds(300))
+			if err != nil {
+				log.Printf("error SetReadDeadline %s: %s\n", src, err)
+				break
+			}
+		}
+
 		n, err := src.Read(buf)
 		if err != nil {
 			log.Error("read failed, err = %v", err)
 			break
 		}
 
-		log.Verbose("iobridge n = %v, buf = %v", n, buf[:n])
+		//log.Verbose("iobridge n = %v, buf = %v", n, buf[:n])
+		var writer *io.Writer
+		if xrw, ok := dst.(relay.XReadWriter); ok {
+			writer = &(xrw.XWriter.Writer)
+		} else {
+			writer = &dst
+		}
+
+		if conn, ok := (*writer).(*net.TCPConn); ok {
+			err := conn.SetWriteDeadline(AfterSeconds(120))
+			if err != nil {
+				log.Printf("error SetWriteDeadline %s: %s\n", dst, err)
+				break
+			}
+		}
 
 		_, err = dst.Write(buf[:n])
 		if err != nil {
