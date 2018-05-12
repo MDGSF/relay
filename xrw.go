@@ -36,7 +36,7 @@ func (r *XReader) Read(p []byte) (n int, err error) {
 	}
 	copy(p, plainBody)
 
-	log.Info("Read r.cipher = %v,  headerlen = %v, bodylen = %v, len(p) = %v, len(plainBody) = %v, plainBody = %v",
+	log.Verbose("Read r.cipher = %v,  headerlen = %v, bodylen = %v, len(p) = %v, len(plainBody) = %v, plainBody = %v",
 		r.cipher, headerlen, bodylen, len(p), len(plainBody), plainBody)
 
 	return len(plainBody), nil
@@ -48,7 +48,7 @@ type XWriter struct {
 }
 
 func (w *XWriter) Write(p []byte) (n int, err error) {
-	log.Info("Write len(p) = %v, w.cipher = %v, p = %v", len(p), w.cipher, p)
+	log.Verbose("Write len(p) = %v, w.cipher = %v, p = %v", len(p), w.cipher, p)
 	crypted, err := x.AesEncrypt(p, w.cipher)
 	if err != nil {
 		log.Error("aed encrypt failed, err = %v", err)
@@ -68,7 +68,7 @@ func (w *XWriter) Write(p []byte) (n int, err error) {
 		return 0, err
 	}
 
-	log.Info("x write n1 = %v, n2 = %v, pLen = %v, crypted = %v", n1, n2, pLen, crypted)
+	log.Verbose("x write n1 = %v, n2 = %v, pLen = %v, crypted = %v", n1, n2, pLen, crypted)
 
 	return n1 + n2, nil
 }

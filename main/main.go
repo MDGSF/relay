@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"io"
 	"net"
 
@@ -28,7 +27,7 @@ func ioBridge(src io.Reader, dst io.Writer, shutdown chan bool) {
 			break
 		}
 
-		log.Info("iobridge n = %v, buf = %v", n, buf[:n])
+		log.Verbose("iobridge n = %v, buf = %v", n, buf[:n])
 
 		_, err = dst.Write(buf[:n])
 		if err != nil {
@@ -91,8 +90,9 @@ func handleConnection(frontconn net.Conn) {
 }
 
 func main() {
-	fmt.Println("relay startting...")
 	flag.Parse()
+
+	log.SetLevel(log.InfoLevel)
 
 	listener, err := net.Listen("tcp", *frontAddr)
 	if err != nil {
