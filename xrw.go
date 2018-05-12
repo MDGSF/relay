@@ -36,7 +36,8 @@ func (r *XReader) Read(p []byte) (n int, err error) {
 	}
 	copy(p, plainBody)
 
-	log.Info("Read len(p) = %v, r.cipher = %v, p = %v, headerlen = %v, bodylen = %v, len(plainBody)", len(p), r.cipher, p, headerlen, bodylen, len(plainBody))
+	log.Info("Read r.cipher = %v,  headerlen = %v, bodylen = %v, len(p) = %v, len(plainBody) = %v, plainBody = %v",
+		r.cipher, headerlen, bodylen, len(p), len(plainBody), plainBody)
 
 	return len(plainBody), nil
 }
@@ -67,7 +68,7 @@ func (w *XWriter) Write(p []byte) (n int, err error) {
 		return 0, err
 	}
 
-	log.Println("x write n1 = %v, n2 = %v, pLen = %v, crypted = %v", n1, n2, pLen, crypted)
+	log.Info("x write n1 = %v, n2 = %v, pLen = %v, crypted = %v", n1, n2, pLen, crypted)
 
 	return n1 + n2, nil
 }
