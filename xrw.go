@@ -4,6 +4,7 @@ import (
 	"io"
 
 	"github.com/MDGSF/utils"
+	"github.com/MDGSF/utils/log"
 	"github.com/MDGSF/utils/x"
 )
 
@@ -16,6 +17,7 @@ func (r *XReader) Read(p []byte) (n int, err error) {
 	headerBuf := make([]byte, 4)
 	headerlen, err := r.Reader.Read(headerBuf)
 	if err != nil || headerlen != 4 {
+		log.Error("x read failed, headerlen = %v, err = %v", headerlen, err)
 		return 0, err
 	}
 
@@ -23,15 +25,20 @@ func (r *XReader) Read(p []byte) (n int, err error) {
 	bodyBuf := make([]byte, bodylen)
 	readedBodyLen, err := io.ReadFull(r.Reader, bodyBuf)
 	if err != nil || readedBodyLen != bodylen {
+		log.Error("read body failed, readedbodylen = %v, bodylen = %v, err = %v", readedBodyLen, bodylen, err)
 		return 0, err
 	}
 
 	plainBody, err := x.AesDecrypt(bodyBuf, r.cipher)
 	if err != nil {
+		log.Error("aes decrypt failed, err = %v", err)
 		return 0, err
 	}
-	p = plainBody
-	return headerlen + bodylen, nil
+	copy(p, plainBody)
+
+	log.Info("Read len(p) = %v, r.cipher = %v, p = %v, headerlen = %v, bodylen = %v, len(plainBody)", len(p), r.cipher, p, headerlen, bodylen, len(plainBody))
+
+	return len(plainBody), nil
 }
 
 type XWriter struct {
@@ -40,21 +47,28 @@ type XWriter struct {
 }
 
 func (w *XWriter) Write(p []byte) (n int, err error) {
+	log.Info("Write len(p) = %v, w.cipher = %v, p = %v", len(p), w.cipher, p)
 	crypted, err := x.AesEncrypt(p, w.cipher)
 	if err != nil {
+		log.Error("aed encrypt failed, err = %v", err)
 		return 0, nil
 	}
 
 	pLen := len(crypted)
 	n1, err := w.Writer.Write(utils.IntTo4Bytes(pLen))
 	if err != nil {
+		log.Error("x write failed, err = %v", err)
 		return 0, err
 	}
 
 	n2, err := w.Writer.Write(crypted)
 	if err != nil {
+		log.Error("x write failed, err = %v", err)
 		return 0, err
 	}
+
+	log.Println("x write n1 = %v, n2 = %v, pLen = %v, crypted = %v", n1, n2, pLen, crypted)
+
 	return n1 + n2, nil
 }
 

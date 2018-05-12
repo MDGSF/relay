@@ -24,11 +24,15 @@ func ioBridge(src io.Reader, dst io.Writer, shutdown chan bool) {
 	for {
 		n, err := src.Read(buf)
 		if err != nil {
+			log.Error("read failed, err = %v", err)
 			break
 		}
 
+		log.Info("iobridge n = %v, buf = %v", n, buf[:n])
+
 		_, err = dst.Write(buf[:n])
 		if err != nil {
+			log.Error("write failed, err = %v", err)
 			break
 		}
 	}
@@ -63,13 +67,19 @@ func handleConnection(frontconn net.Conn) {
 	var frontIO io.ReadWriter
 	var backenIO io.ReadWriter
 	if len(*frontCipher) > 0 {
-		frontIO = relay.NewXReadWriter(frontconn, []byte(*frontCipher))
+		key := make([]byte, 0)
+		key = append(key, *frontCipher...)
+		key = append(key, "fdajlfsakfjsalkf"...)
+		frontIO = relay.NewXReadWriter(frontconn, key[:16])
 	} else {
 		frontIO = frontconn
 	}
 
 	if len(*backenCipher) > 0 {
-		backenIO = relay.NewXReadWriter(backconn, []byte(*backenCipher))
+		key := make([]byte, 0)
+		key = append(key, *backenCipher...)
+		key = append(key, "fdajlfsakfjsalkf"...)
+		backenIO = relay.NewXReadWriter(backconn, key[:16])
 	} else {
 		backenIO = backconn
 	}
@@ -94,6 +104,7 @@ func main() {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
+			log.Error("accept failed, err = %v", err)
 			continue
 		}
 		go handleConnection(conn)
