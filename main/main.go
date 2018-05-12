@@ -3,18 +3,36 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"net"
 
+	"github.com/MDGSF/relay"
 	"github.com/MDGSF/utils/log"
 )
 
 var frontAddr = flag.String("faddr", "0.0.0.0:1080", "front address")
 var backenAddr = flag.String("baddr", "", "backen address")
+var frontCipher = flag.String("frc", "", "front cipher")
+var backenCipher = flag.String("brc", "", "backen cipher")
 
-var frontReadCipher = flag.String("frc", "", "front read cipher")
-var frontWriteCipher = flag.String("fwc", "", "front write cipher")
-var backenReadCipher = flag.String("brc", "", "backen read cipher")
-var backenWriteCipher = flag.String("bwc", "", "backen write cipher")
+func ioBridge(src io.Reader, dst io.Writer, shutdown chan bool) {
+	defer func() {
+		shutdown <- true
+	}()
+
+	buf := make([]byte, 8*1024)
+	for {
+		n, err := src.Read(buf)
+		if err != nil {
+			break
+		}
+
+		_, err = dst.Write(buf[:n])
+		if err != nil {
+			break
+		}
+	}
+}
 
 func handleConnection(frontconn net.Conn) {
 	frontNetwork := frontconn.RemoteAddr().Network()
@@ -41,6 +59,25 @@ func handleConnection(frontconn net.Conn) {
 		backconn.Close()
 		log.Info("close backconn = %v, %v", backenNetwork, backenaddr)
 	}()
+
+	var frontIO io.ReadWriter
+	var backenIO io.ReadWriter
+	if len(*frontCipher) > 0 {
+		frontIO = relay.NewXReadWriter(frontconn, []byte(*frontCipher))
+	} else {
+		frontIO = frontconn
+	}
+
+	if len(*backenCipher) > 0 {
+		backenIO = relay.NewXReadWriter(backconn, []byte(*backenCipher))
+	} else {
+		backenIO = backconn
+	}
+
+	shutdown := make(chan bool, 2)
+	go ioBridge(frontIO, backenIO, shutdown)
+	go ioBridge(backenIO, frontIO, shutdown)
+	<-shutdown
 }
 
 func main() {
