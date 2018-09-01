@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"crypto/sha1"
 	"encoding/hex"
 	"flag"
@@ -29,7 +28,7 @@ const (
 
 func padCipherTo32Key(cipher string) []byte {
 	if len(cipher) == 0 {
-		return append([]byte("hj"), bytes.Repeat([]byte("relay"), 6)...)
+		return nil
 	}
 
 	var hasher hash.Hash
@@ -53,6 +52,13 @@ func NewXConn(conn net.Conn, key []byte) *TXConn {
 }
 
 func (c *TXConn) Read(p []byte) (n int, err error) {
+	if c.key == nil || len(c.key) == 0 {
+		return c.conn.Read(p)
+	}
+	return c.xread(p)
+}
+
+func (c *TXConn) xread(p []byte) (n int, err error) {
 	err = c.conn.SetReadDeadline(time.Now().Add(DefaultReadTimeout))
 	if err != nil {
 		log.Printf("SetReadDeadline failed, err = %v\n", err)
@@ -84,14 +90,23 @@ func (c *TXConn) Read(p []byte) (n int, err error) {
 	log.Verbose("Read c.key = %v,  headerlen = %v, bodylen = %v, len(p) = %v, len(plainBody) = %v, plainBody = %v",
 		c.key, headerlen, bodylen, len(p), len(plainBody), plainBody)
 
-	return len(plainBody), nil
+	return len(p), nil
 }
 
 func (c *TXConn) Write(p []byte) (n int, err error) {
+	if c.key == nil || len(c.key) == 0 {
+		return c.conn.Write(p)
+	}
+	return c.xwrite(p)
+}
+
+func (c *TXConn) xwrite(p []byte) (n int, err error) {
 	log.Verbose("Write len(p) = %v, c.key = %v, p = %v", len(p), c.key, p)
-	crypted, err := x.AesEncrypt(p, c.key)
+
+	var crypted []byte
+	crypted, err = x.AesEncrypt(p, c.key)
 	if err != nil {
-		log.Error("aed encrypt failed, err = %v", err)
+		log.Error("aes encrypt failed, err = %v", err)
 		return 0, err
 	}
 
@@ -119,7 +134,8 @@ func (c *TXConn) Write(p []byte) (n int, err error) {
 }
 
 func ioBridge(src *TXConn, dst *TXConn) {
-	buf := make([]byte, 8192)
+	buf := utils.GLeakyBuf.Get()
+	defer utils.GLeakyBuf.Put(buf)
 	for {
 		n, err := src.Read(buf)
 		if err != nil || n == 0 {
@@ -170,14 +186,6 @@ func handleConnection(frontconn net.Conn) {
 func main() {
 	flag.Parse()
 	log.SetLevel(log.InfoLevel)
-
-	if len(*frontCipher) == 0 {
-		panic("invalid frontCipher")
-	}
-
-	if len(*backenCipher) == 0 {
-		panic("invalid backenCipher")
-	}
 
 	frontKey = padCipherTo32Key(*frontCipher)
 	backenKey = padCipherTo32Key(*backenCipher)
