@@ -85,12 +85,12 @@ func (c *TXConn) xread(p []byte) (n int, err error) {
 		log.Error("aes decrypt failed, err = %v", err)
 		return 0, err
 	}
-	p = plainBody
+	copy(p, plainBody)
 
 	log.Verbose("Read c.key = %v,  headerlen = %v, bodylen = %v, len(p) = %v, len(plainBody) = %v, plainBody = %v",
 		c.key, headerlen, bodylen, len(p), len(plainBody), plainBody)
 
-	return len(p), nil
+	return len(plainBody), nil
 }
 
 func (c *TXConn) Write(p []byte) (n int, err error) {
